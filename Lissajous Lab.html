@@ -1,0 +1,424 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Lissajous Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: an XY oscilloscope bench — square scope screen beside a control panel, waveform strips below, then field notes and a ratio drill. */
+:root{
+  --bg:#e9eeec; --panel:#f6f8f7; --ink:#14252a; --muted:#56686b; --line:#c8d4d1;
+  --grid:#cdd8d5; --grid-strong:#9fb2ae; --screen:#fbfcfb;
+  --trace:#b9541b; --trace-2:#1f6f78; --pen:#14252a; --good:#2f7a3c; --bad:#b3261e;
+  --glow:0;
+  --f-display:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --f-body:"Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0c1110; --panel:#121a18; --ink:#e4ece8; --muted:#8fa29c; --line:#24312e;
+  --grid:#1c2925; --grid-strong:#33463f; --screen:#08100d;
+  --trace:#ffb547; --trace-2:#6fd1c4; --pen:#fff3d6; --good:#7fd28c; --bad:#ff8a80;
+  --glow:1; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0c1110; --panel:#121a18; --ink:#e4ece8; --muted:#8fa29c; --line:#24312e;
+  --grid:#1c2925; --grid-strong:#33463f; --screen:#08100d;
+  --trace:#ffb547; --trace-2:#6fd1c4; --pen:#fff3d6; --good:#7fd28c; --bad:#ff8a80;
+  --glow:1; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:28px 56px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--f-display);font-weight:400;text-wrap:balance;margin:0;line-height:1.1}
+h1{font-size:clamp(2.4rem,6vw,3.6rem)}
+h1 em{color:var(--trace)}
+h2{font-size:1.9rem}
+h3{font-size:1.3rem}
+p{margin:0}
+.lede{max-width:62ch;color:var(--muted);font-size:1.05rem}
+.eq{font-family:var(--f-mono);font-size:.95rem;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  padding:10px 14px;border-radius:6px;display:inline-block;overflow-x:auto;max-width:100%}
+header{display:flex;flex-direction:column;gap:14px}
+.label{font:600 .72rem/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* bench */
+.bench{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:820px){.bench{grid-template-columns:1fr}}
+.scope{display:flex;flex-direction:column;gap:10px;min-width:0}
+.screen{position:relative;width:100%;max-width:100%;aspect-ratio:1/1;background:var(--screen);border:1px solid var(--grid-strong);border-radius:10px;overflow:hidden}
+.screen canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.readout{position:absolute;left:12px;top:10px;font:600 .78rem/1.4 var(--f-mono);color:var(--muted);pointer-events:none}
+.readout b{color:var(--trace);font-weight:600}
+.status{position:absolute;right:12px;top:10px;font:600 .7rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;
+  padding:5px 8px;border-radius:99px;border:1px solid var(--grid-strong);color:var(--muted);background:var(--screen)}
+.status.warn{color:var(--trace);border-color:var(--trace)}
+.strips{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strip{position:relative;height:74px;background:var(--screen);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.strip canvas{position:absolute;inset:0;width:100%;height:100%}
+.strip span{position:absolute;left:8px;top:6px;font:600 .7rem/1 var(--f-mono);color:var(--muted)}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.ctl{display:flex;flex-direction:column;gap:6px}
+.ctl-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ctl-top label{font-weight:600}
+.ctl-top output{font:600 .9rem var(--f-mono);color:var(--trace);font-variant-numeric:tabular-nums}
+.hint{font-size:.82rem;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--trace)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+button,.chip{font:500 .85rem var(--f-body);color:var(--ink);background:transparent;border:1px solid var(--grid-strong);border-radius:6px;padding:7px 11px;cursor:pointer}
+button:hover{border-color:var(--trace)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--trace);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--trace);border-color:var(--trace);color:var(--screen)}
+.presets button{font-family:var(--f-mono);font-size:.8rem}
+.checks{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.88rem}
+.checks label{display:flex;gap:6px;align-items:center;cursor:pointer}
+hr{border:0;border-top:1px solid var(--line);margin:0}
+
+/* notes */
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:28px 36px}
+.note{display:flex;flex-direction:column;gap:8px;min-width:0}
+.note p{max-width:62ch}
+.note .try{font-size:.88rem;color:var(--trace-2);background:none;border:0;padding:0;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.mono{font-family:var(--f-mono);font-size:.9em}
+
+/* drill */
+.drill{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:24px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px}
+@media (max-width:640px){.drill{grid-template-columns:1fr}}
+.drill .screen{max-width:260px}
+.answers{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;margin-top:12px}
+.answers button{font-family:var(--f-mono)}
+.answers button.right{background:var(--good);border-color:var(--good);color:var(--screen)}
+.answers button.wrong{border-color:var(--bad);color:var(--bad)}
+.score{font:600 .85rem var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+#feedback{min-height:1.6em;font-size:.95rem}
+footer{font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+footer a{color:var(--trace-2)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="label">XY mode · two sine waves, one dot</span>
+    <h1>Lissajous <em>Lab</em></h1>
+    <p class="lede">Feed one sine wave into the horizontal axis and another into the vertical, and the dot draws a Lissajous figure. Change the frequency ratio, shift the phase, and watch the shape answer back.</p>
+    <code class="eq">x = A·sin(a·t + δ) &nbsp;&nbsp; y = B·sin(b·t)</code>
+  </header>
+
+  <section class="bench" aria-label="Lissajous oscilloscope">
+    <div class="scope">
+      <div class="screen">
+        <canvas id="scope" aria-label="Lissajous curve plot"></canvas>
+        <div class="readout" id="readout"></div>
+        <div class="status" id="status">closed</div>
+      </div>
+      <div class="strips">
+        <div class="strip"><canvas id="sx"></canvas><span>x(t) · horizontal</span></div>
+        <div class="strip"><canvas id="sy"></canvas><span>y(t) · vertical</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ctl">
+        <div class="ctl-top"><label for="a">Horizontal frequency a</label><output id="aOut"></output></div>
+        <input type="range" id="a" min="1" max="9" step="1" value="3">
+      </div>
+      <div class="ctl">
+        <div class="ctl-top"><label for="b">Vertical frequency b</label><output id="bOut"></output></div>
+        <input type="range" id="b" min="1" max="9" step="1" value="2">
+      </div>
+      <div class="ctl">
+        <div class="ctl-top"><label for="d">Phase shift δ</label><output id="dOut"></output></div>
+        <input type="range" id="d" min="0" max="6.2832" step="0.0001" value="1.5708">
+      </div>
+      <div class="ctl">
+        <div class="ctl-top"><label for="ab">Amplitude ratio A : B</label><output id="abOut"></output></div>
+        <input type="range" id="ab" min="0.4" max="1" step="0.01" value="1">
+        <span class="hint">Below 1 the figure squeezes horizontally (A shrinks).</span>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="fine"> Non-integer frequencies</label>
+        <label><input type="checkbox" id="touch" checked> Mark edge touches</label>
+      </div>
+      <hr>
+      <div class="row" role="group" aria-label="Motion">
+        <button id="trace" aria-pressed="true">Trace pen</button>
+        <button id="drift" aria-pressed="false">Drift phase</button>
+        <button id="sound" aria-pressed="false">Play as stereo tones</button>
+      </div>
+      <div class="ctl">
+        <div class="ctl-top"><label for="speed">Speed</label><output id="speedOut"></output></div>
+        <input type="range" id="speed" min="0.1" max="3" step="0.1" value="1">
+      </div>
+      <hr>
+      <div class="ctl">
+        <span class="label">Presets (a : b, δ)</span>
+        <div class="row presets" id="presets"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="notes" aria-label="How it works">
+    <div class="note">
+      <h3>The ratio sets the shape</h3>
+      <p>When <span class="mono">a/b</span> is a ratio of whole numbers the pen returns to its start and the curve closes. Small ratios like 1:2 or 3:2 give simple, open loops; larger ones such as 7:6 weave a dense mesh.</p>
+      <button class="try" data-p="3,2,1.5708">Try 3 : 2</button>
+    </div>
+    <div class="note">
+      <h3>Count the touches</h3>
+      <p>For a closed curve, count where it touches the right edge and where it touches the top edge. Right-edge touches equal <span class="mono">a</span>, top-edge touches equal <span class="mono">b</span>. Engineers used exactly this trick on oscilloscopes to compare an unknown frequency with a reference.</p>
+      <button class="try" data-p="5,4,0.4">Count on 5 : 4</button>
+    </div>
+    <div class="note">
+      <h3>Phase turns it in depth</h3>
+      <p>Sweeping δ makes the figure look like a 3-D wire rotating. At certain phases the forward and return paths overlap and the curve collapses into an open arc: 1:1 at δ = 0 is a straight line, and 1:2 at δ = π/4 is a parabola.</p>
+      <button class="try" data-p="1,2,0.7854">See the 1 : 2 parabola</button>
+    </div>
+    <div class="note">
+      <h3>1 : 1 is the ellipse family</h3>
+      <p>With equal frequencies you get an ellipse. At δ = π/2 and equal amplitudes it is a circle; at δ = 0 or π it flattens to a diagonal line. The tilt of the ellipse tells you the phase difference between two signals of the same frequency.</p>
+      <button class="try" data-p="1,1,1.5708">Make a circle</button>
+    </div>
+    <div class="note">
+      <h3>Irrational ratios never close</h3>
+      <p>Tick “Non-integer frequencies” and set something like 1 : 1.41. The pen never repeats; given enough time it fills the whole rectangle. A near-whole ratio such as 2 : 1.01 looks like a slowly rotating 2:1 figure instead.</p>
+      <button class="try" data-p="2,1.01,0" data-fine="1">Try 2 : 1.01</button>
+    </div>
+    <div class="note">
+      <h3>A little history</h3>
+      <p>Nathaniel Bowditch studied these curves in 1815 using a compound pendulum. Jules Antoine Lissajous explored them in 1857 by bouncing light off mirrors fixed to two vibrating tuning forks, letting audiences see musical intervals: a perfect fifth (3:2) or an octave (2:1).</p>
+      <button class="try" data-p="2,1,0">See an octave</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="drillTitle" style="display:flex;flex-direction:column;gap:14px">
+    <h2 id="drillTitle">Read the ratio</h2>
+    <p class="lede">Count edge touches on the mystery figure, then pick its <span class="mono">a : b</span>.</p>
+    <div class="drill">
+      <div class="screen"><canvas id="quiz" aria-label="Mystery Lissajous figure"></canvas></div>
+      <div>
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <span class="score" id="score">0 / 0</span>
+          <button id="next">New figure</button>
+        </div>
+        <div class="answers" id="answers"></div>
+        <p id="feedback" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+  <footer>Based on the Wikipedia article <a href="https://en.wikipedia.org/wiki/Lissajous_curve" target="_blank" rel="noopener">Lissajous curve</a>. Sound uses the left channel for x and the right for y, the same wiring as oscilloscope music.</footer>
+</div>
+
+<script>
+(()=>{
+const TAU=Math.PI*2, $=id=>document.getElementById(id);
+const st={a:3,b:2,d:Math.PI/2,ab:1,fine:false,touch:true,trace:true,drift:false,speed:1,t:0};
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduce){st.trace=false;$('trace').setAttribute('aria-pressed','false')}
+
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function gcd(a,b){while(b){[a,b]=[b,a%b]}return a}
+function piFrac(v){
+  const r=((v%TAU)+TAU)%TAU, q=r/Math.PI;
+  const fr=[[0,'0'],[1/6,'π/6'],[1/4,'π/4'],[1/3,'π/3'],[1/2,'π/2'],[2/3,'2π/3'],[3/4,'3π/4'],[5/6,'5π/6'],[1,'π'],[7/6,'7π/6'],[5/4,'5π/4'],[4/3,'4π/3'],[3/2,'3π/2'],[5/3,'5π/3'],[7/4,'7π/4'],[11/6,'11π/6'],[2,'0']];
+  for(const [f,s] of fr) if(Math.abs(q-f)<0.006) return s;
+  return q.toFixed(2)+'π';
+}
+function approxRatio(a,b){ // best small-integer ratio
+  for(let q=1;q<=12;q++){const p=Math.round(a/b*q); if(p>0&&Math.abs(p/q-a/b)<1e-4) return [p,q]}
+  return null;
+}
+// degenerate when the curve retraces itself: delta ≡ (π − a(2k+1)π/b)/2 (mod π)
+function degenerate(a,b,d){
+  if(!Number.isInteger(a)||!Number.isInteger(b)) return false;
+  const g=gcd(a,b); a/=g; b/=g;
+  for(let k=0;k<b;k++){
+    const t=(Math.PI-a*(2*k+1)*Math.PI/b)/2;
+    let diff=((d-t)%Math.PI+Math.PI)%Math.PI; diff=Math.min(diff,Math.PI-diff);
+    if(diff<0.004) return true;
+  }
+  return false;
+}
+
+function fit(c){const r=c.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+  const w=Math.round(r.width*dpr),h=Math.round(r.height*dpr);
+  if(c.width!==w||c.height!==h){c.width=w;c.height=h}
+  const x=c.getContext('2d');x.setTransform(1,0,0,1,0,0);return {x,w,h,dpr}}
+
+function graticule(g,w,h,dpr){
+  g.fillStyle=css('--screen');g.fillRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=1*dpr;g.beginPath();
+  for(let i=1;i<8;i++){const X=Math.round(w*i/8)+.5,Y=Math.round(h*i/8)+.5;g.moveTo(X,0);g.lineTo(X,h);g.moveTo(0,Y);g.lineTo(w,Y)}
+  g.stroke();
+  g.strokeStyle=css('--grid-strong');g.beginPath();
+  const cx=w/2,cy=h/2;g.moveTo(cx,0);g.lineTo(cx,h);g.moveTo(0,cy);g.lineTo(w,cy);
+  for(let i=0;i<=40;i++){const X=w*i/40,Y=h*i/40,s=(i%5?3:6)*dpr;g.moveTo(X,cy-s);g.lineTo(X,cy+s);g.moveTo(cx-s,Y);g.lineTo(cx+s,Y)}
+  g.stroke();
+}
+
+function drawCurve(g,w,h,dpr,o){
+  const {a,b,d,ab,tEnd,color,width,glow}=o, m=0.1, R=Math.min(w,h)*(0.5-m);
+  const cx=w/2,cy=h/2,A=R*ab,B=R;
+  const N=Math.max(1200,Math.ceil(tEnd*240));
+  g.save();
+  if(glow){g.shadowColor=color;g.shadowBlur=8*dpr}
+  g.strokeStyle=color;g.lineWidth=width*dpr;g.lineJoin='round';g.lineCap='round';g.beginPath();
+  for(let i=0;i<=N;i++){const t=tEnd*i/N;const X=cx+A*Math.sin(a*t+d),Y=cy-B*Math.sin(b*t);i?g.lineTo(X,Y):g.moveTo(X,Y)}
+  g.stroke();g.restore();
+  return {cx,cy,A,B};
+}
+
+const sc=$('scope'), sx=$('sx'), sy=$('sy');
+function periodLen(){
+  if(!st.fine) return TAU/gcd(st.a,st.b)*1; // integers: closes within 2π
+  const r=approxRatio(st.a,st.b);
+  if(r){return TAU*r[1]/st.b} // closes after q cycles of b
+  return TAU*24;
+}
+
+function render(){
+  const {x:g,w,h,dpr}=fit(sc); graticule(g,w,h,dpr);
+  const glow=css('--glow')==='1', P=periodLen();
+  const trace=css('--trace');
+  // ghost full curve
+  g.globalAlpha=st.trace?0.22:1;
+  const geo=drawCurve(g,w,h,dpr,{a:st.a,b:st.b,d:st.d,ab:st.ab,tEnd:P,color:trace,width:st.trace?1.2:1.8,glow:glow&&!st.trace});
+  g.globalAlpha=1;
+  const tNow=st.trace?(st.t%P):0;
+  if(st.trace){
+    // bright trail: last part of path
+    const tail=Math.min(P,Math.PI*1.2), t0=Math.max(0,tNow-tail);
+    g.save(); if(glow){g.shadowColor=trace;g.shadowBlur=10*dpr}
+    g.strokeStyle=trace;g.lineWidth=2.2*dpr;g.lineCap='round';g.beginPath();
+    const N=300;
+    for(let i=0;i<=N;i++){const t=t0+(tNow-t0)*i/N;const X=geo.cx+geo.A*Math.sin(st.a*t+st.d),Y=geo.cy-geo.B*Math.sin(st.b*t);i?g.lineTo(X,Y):g.moveTo(X,Y)}
+    g.stroke();g.restore();
+    const px=geo.cx+geo.A*Math.sin(st.a*tNow+st.d),py=geo.cy-geo.B*Math.sin(st.b*tNow);
+    g.strokeStyle=css('--grid-strong');g.setLineDash([3*dpr,4*dpr]);g.lineWidth=1*dpr;g.beginPath();
+    g.moveTo(px,py);g.lineTo(px,h);g.moveTo(px,py);g.lineTo(0,py);g.stroke();g.setLineDash([]);
+    g.fillStyle=css('--pen');g.beginPath();g.arc(px,py,4.5*dpr,0,TAU);g.fill();
+  }
+  // edge touches (integer, closed)
+  const integer=Number.isInteger(st.a)&&Number.isInteger(st.b);
+  const degen=degenerate(st.a,st.b,st.d);
+  if(st.touch&&integer){
+    const G=gcd(st.a,st.b),a=st.a/G,b=st.b/G,c2=css('--trace-2'),s=7*dpr;
+    g.fillStyle=c2;g.strokeStyle=c2;g.lineWidth=2*dpr;
+    const seen=new Set();
+    for(let k=0;k<b;k++){const t=(Math.PI/2+TAU*k)/b,X=geo.cx+geo.A*Math.sin(a*t+st.d);const key='t'+Math.round(X);if(seen.has(key))continue;seen.add(key);
+      g.beginPath();g.moveTo(X-s,geo.cy-geo.B-s*1.6);g.lineTo(X+s,geo.cy-geo.B-s*1.6);g.lineTo(X,geo.cy-geo.B-s*.3);g.closePath();g.fill()}
+    for(let k=0;k<a;k++){const t=(Math.PI/2+TAU*k-st.d)/a,Y=geo.cy-geo.B*Math.sin(b*t);const key='r'+Math.round(Y);if(seen.has(key))continue;seen.add(key);
+      const X=geo.cx+geo.A;g.beginPath();g.moveTo(X+s*1.6,Y-s);g.lineTo(X+s*1.6,Y+s);g.lineTo(X+s*.3,Y);g.closePath();g.fill()}
+  }
+  // readout + status
+  const r=integer?[st.a/gcd(st.a,st.b),st.b/gcd(st.a,st.b)]:approxRatio(st.a,st.b);
+  $('readout').innerHTML=`a : b = <b>${fmt(st.a)} : ${fmt(st.b)}</b>${r&&(r[0]!==st.a||r[1]!==st.b)?` (= ${r[0]}:${r[1]})`:''}<br>δ = <b>${piFrac(st.d)}</b>`;
+  const s=$('status');
+  if(degen){s.textContent='degenerate · retraces';s.className='status warn'}
+  else if(!r){s.textContent='never closes';s.className='status warn'}
+  else {s.textContent=st.touch&&integer?`▲ top ${r[1]} · ◀ right ${r[0]}`:'closed';s.className='status'}
+  strip(sx,t=>st.ab*Math.sin(st.a*t+st.d),tNow,P);
+  strip(sy,t=>Math.sin(st.b*t),tNow,P);
+}
+function fmt(v){return Number.isInteger(v)?String(v):v.toFixed(2)}
+function strip(c,f,tNow,P){
+  const {x:g,w,h,dpr}=fit(c);g.fillStyle=css('--screen');g.fillRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=dpr;g.beginPath();g.moveTo(0,h/2);g.lineTo(w,h/2);g.stroke();
+  const span=Math.min(P,TAU*2);
+  g.strokeStyle=css('--trace');g.lineWidth=1.6*dpr;g.beginPath();
+  for(let i=0;i<=400;i++){const t=span*i/400;const Y=h/2-f(t)*h*0.34;i?g.lineTo(w*i/400,Y):g.moveTo(0,Y)}
+  g.stroke();
+  if(st.trace){const tt=tNow%span,X=w*tt/span;g.fillStyle=css('--pen');g.beginPath();g.arc(X,h/2-f(tt)*h*0.34,3.5*dpr,0,TAU);g.fill()}
+}
+
+// controls
+const aI=$('a'),bI=$('b'),dI=$('d'),abI=$('ab'),spI=$('speed');
+function syncOut(){$('aOut').textContent=fmt(st.a);$('bOut').textContent=fmt(st.b);$('dOut').textContent=piFrac(st.d)+'  ('+(st.d*180/Math.PI).toFixed(0)+'°)';
+  $('abOut').textContent=st.ab.toFixed(2);$('speedOut').textContent=st.speed.toFixed(1)+'×'}
+function setFine(on){st.fine=on;$('fine').checked=on;for(const el of [aI,bI]){el.step=on?'0.01':'1'}
+  if(!on){st.a=Math.max(1,Math.round(st.a));st.b=Math.max(1,Math.round(st.b));aI.value=st.a;bI.value=st.b}}
+aI.oninput=()=>{st.a=+aI.value;syncOut();updateAudio();if(!running)render()};
+bI.oninput=()=>{st.b=+bI.value;syncOut();updateAudio();if(!running)render()};
+dI.oninput=()=>{st.d=+dI.value;syncOut();if(!running)render()};
+abI.oninput=()=>{st.ab=+abI.value;syncOut();if(!running)render()};
+spI.oninput=()=>{st.speed=+spI.value;syncOut()};
+$('fine').onchange=e=>{setFine(e.target.checked);syncOut();render()};
+$('touch').onchange=e=>{st.touch=e.target.checked;render()};
+function toggle(btn,key){btn.onclick=()=>{st[key]=!st[key];btn.setAttribute('aria-pressed',st[key]);loop()}}
+toggle($('trace'),'trace');toggle($('drift'),'drift');
+
+function setCurve(a,b,d,fine){setFine(!!fine||!Number.isInteger(a)||!Number.isInteger(b));st.a=a;st.b=b;st.d=d;aI.value=a;bI.value=b;dI.value=d;st.t=0;syncOut();updateAudio();render()}
+const presets=[[1,1,Math.PI/2,'1:1 circle'],[1,2,0,'1:2 figure 8'],[3,2,Math.PI/2,'3:2 fifth'],[3,4,Math.PI/4,'3:4'],[5,4,Math.PI/2,'5:4'],[1,3,Math.PI/2,'1:3'],[7,6,Math.PI/2,'7:6'],[9,8,Math.PI/2,'9:8']];
+for(const [a,b,d,l] of presets){const bt=document.createElement('button');bt.textContent=l;bt.onclick=()=>setCurve(a,b,d);$('presets').append(bt)}
+document.querySelectorAll('.try').forEach(bt=>bt.onclick=()=>{const [a,b,d]=bt.dataset.p.split(',').map(Number);setCurve(a,b,d,bt.dataset.fine);
+  if(bt.dataset.p==='5,4,0.4'){st.touch=true;$('touch').checked=true;render()}
+  document.querySelector('.bench').scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'})});
+
+// animation
+let running=false,last=0;
+function frame(ts){
+  if(!(st.trace||st.drift)){running=false;render();return}
+  const dt=Math.min(0.05,(ts-(last||ts))/1000);last=ts;
+  if(st.trace) st.t+=dt*st.speed*1.4;
+  if(st.drift){st.d=(st.d+dt*st.speed*0.35)%TAU;dI.value=st.d;syncOut()}
+  render();requestAnimationFrame(frame);
+}
+function loop(){if(!running){running=true;last=0;requestAnimationFrame(frame)}}
+
+// audio
+let ac=null,oL=null,oR=null,gain=null;
+function updateAudio(){if(!oL)return;const base=110;oL.frequency.setTargetAtTime(base*st.a,ac.currentTime,.02);oR.frequency.setTargetAtTime(base*st.b,ac.currentTime,.02)}
+$('sound').onclick=async()=>{
+  const btn=$('sound');
+  try{
+    if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();}
+    if(oL){gain.gain.setTargetAtTime(0,ac.currentTime,.03);const a=oL,b=oR;setTimeout(()=>{a.stop();b.stop()},150);oL=oR=null;btn.setAttribute('aria-pressed','false');btn.textContent='Play as stereo tones';return}
+    await ac.resume();
+    gain=ac.createGain();gain.gain.value=0;gain.connect(ac.destination);
+    const mk=(pan)=>{const o=ac.createOscillator();o.type='sine';const p=ac.createStereoPanner?ac.createStereoPanner():null;
+      if(p){p.pan.value=pan;o.connect(p);p.connect(gain)}else o.connect(gain);o.start();return o};
+    oL=mk(-1);oR=mk(1);updateAudio();gain.gain.setTargetAtTime(0.08,ac.currentTime,.05);
+    btn.setAttribute('aria-pressed','true');btn.textContent='Stop tones';
+  }catch(e){btn.textContent='Sound unavailable here'}
+};
+
+// quiz
+const qc=$('quiz');let q=null,score=0,tries=0,answered=false;
+const pairs=[];for(let a=1;a<=6;a++)for(let b=1;b<=6;b++)if(gcd(a,b)===1)pairs.push([a,b]);
+function newQ(){
+  let a,b,d,guard=0;
+  do{[a,b]=pairs[Math.floor(Math.random()*pairs.length)];d=0.2+Math.random()*(Math.PI-0.4);guard++}
+  while((degenNear(a,b,d)||(q&&q.a===a&&q.b===b))&&guard<200);
+  q={a,b,d};answered=false;$('feedback').textContent='';
+  const opts=new Set([a+':'+b]);
+  while(opts.size<6){const p=pairs[Math.floor(Math.random()*pairs.length)];opts.add(p[0]+':'+p[1])}
+  if(Math.random()<.7&&a!==b)opts.add(b+':'+a);
+  const list=[...opts].slice(0,6);if(!list.includes(a+':'+b))list[0]=a+':'+b;
+  list.sort(()=>Math.random()-.5);
+  const box=$('answers');box.innerHTML='';
+  for(const s of list){const bt=document.createElement('button');bt.textContent=s.replace(':',' : ');bt.onclick=()=>pick(bt,s);box.append(bt)}
+  drawQ();
+}
+function degenNear(a,b,d){for(let k=0;k<b;k++){const t=(Math.PI-a*(2*k+1)*Math.PI/b)/2;let diff=((d-t)%Math.PI+Math.PI)%Math.PI;diff=Math.min(diff,Math.PI-diff);if(diff<0.25)return true}return false}
+function drawQ(){if(!q)return;const {x:g,w,h,dpr}=fit(qc);graticule(g,w,h,dpr);drawCurve(g,w,h,dpr,{a:q.a,b:q.b,d:q.d,ab:1,tEnd:TAU,color:css('--trace'),width:1.8,glow:css('--glow')==='1'})}
+function pick(bt,s){
+  if(answered)return;const right=s===q.a+':'+q.b;
+  if(right){bt.classList.add('right');answered=true;score++;tries++;
+    $('feedback').innerHTML=`Yes: ${q.a} touch${q.a>1?'es':''} on the right edge, ${q.b} on the top.`}
+  else{bt.classList.add('wrong');tries++;answered=true;
+    [...$('answers').children].forEach(x=>{if(x.textContent.replace(/ /g,'')===q.a+':'+q.b)x.classList.add('right')});
+    $('feedback').innerHTML=`It was ${q.a} : ${q.b}. Count the right edge for a, the top edge for b.`}
+  $('score').textContent=`${score} / ${tries}`;
+}
+$('next').onclick=newQ;
+
+// init
+syncOut();
+const ro=new ResizeObserver(()=>{render();drawQ()});ro.observe(sc);ro.observe(qc);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{render();drawQ()});
+new MutationObserver(()=>{render();drawQ()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+newQ();render();if(st.trace)loop();
+})();
+</script>
+
+</body></html>
